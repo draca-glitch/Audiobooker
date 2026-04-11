@@ -1,0 +1,74 @@
+# audiobooker — minimal example cast for the park bench demo chapter.
+#
+# This is the minimal-but-realistic shape: a narrator, two named characters,
+# gender fallbacks for unnamed minor characters, no special features enabled.
+#
+# Pair this file with examples/chapter.example.txt:
+#   audiobooker examples/chapter.example.txt --cast examples/cast.example.yaml
+#
+# By default this uses Kokoro (local, free, no API key required).
+# To use ElevenLabs instead, uncomment the elevenlabs_voice lines below
+# and run with: --engine elevenlabs   (or --engine hybrid for the best of both).
+
+engine_defaults:
+  output_dir: ./out
+  sample_rate: 24000
+  llm:
+    base_url: https://api.anthropic.com/v1
+    model: claude-opus-4-6
+    api_key_env: ANTHROPIC_API_KEY     # only the env var NAME — never put a key here
+    compat: anthropic                  # "anthropic" or "openai" (for OpenAI-compatible endpoints)
+    max_tokens: 16384
+
+kokoro:
+  model: /opt/kokoro/kokoro-v1.0.onnx
+  voices: /opt/kokoro/voices-v1.0.bin
+  language: en-us
+
+# Uncomment if you plan to use --engine elevenlabs or --engine hybrid
+# elevenlabs:
+#   api_url: https://api.elevenlabs.io/v1/text-to-speech
+#   model: eleven_multilingual_v2
+#   api_key_env: ELEVENLABS_API_KEY
+#   output_format: pcm_24000
+
+features:
+  hud_brackets: false        # see cast-hud.example.yaml for HUD demo
+  entity_italics: false
+
+# ----- Cast --------------------------------------------------------------
+# Each entry maps a character name (as used in the chapter text) to a voice.
+# Required: at least a `narrator` entry.
+# Optional special entries: _hud, _female_fallback, _male_fallback.
+cast:
+  narrator:
+    kokoro_voice: am_michael            # steady, authoritative
+    speed: 1.0
+    # elevenlabs_voice: JBFqnCBsd6RMkjVDRZzb   # George — warm storyteller (public preset)
+
+  Anna:
+    kokoro_voice: af_bella              # warm, friendly
+    speed: 0.95
+    # elevenlabs_voice: hpp4J3VqNfWAUOO0d1Us
+
+  Marcus:
+    kokoro_voice: bm_lewis              # calm, mid-range male
+    speed: 1.0
+    # elevenlabs_voice: onwK4e9ZLuTAKqWW03F9
+
+  # Fallback voices for any unnamed character the parser tags by gender.
+  _female_fallback:
+    kokoro_voice: af_jessica
+  _male_fallback:
+    kokoro_voice: am_liam
+
+# ----- Pronunciations ----------------------------------------------------
+# Optional. Replace tricky words with phonetic spellings (case-insensitive).
+# Built-in fixes already handle: em-dash → comma, "..." pauses, kg/cm/km/mm
+# spelled out, thousands separators stripped.
+pronunciations: {}
+
+# ----- Effects -----------------------------------------------------------
+# Optional. Each named effect is a list of pedalboard plugins applied in order.
+# See cast-hud.example.yaml for a worked example.
+effects: {}

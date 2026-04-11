@@ -1,0 +1,40 @@
+{
+  "_comment": "SFX mix config for examples/chapter-hud.example.txt. Pairs with audiobooker-mix-sfx after audiobooker has rendered the segments. Place WAV files referenced below in your sfx_dir; the names here are placeholders for whatever ambient/oneshot files you actually have.",
+
+  "ambients": [
+    {
+      "_comment": "Quiet corridor hum bed under most of the scene. Looped + faded.",
+      "file": "corridor-hum.wav",
+      "start_seg": 0,
+      "end_seg": 30,
+      "volume": 0.06
+    }
+  ],
+
+  "oneshots": [
+    {
+      "_comment": "Light flicker click on the opening line.",
+      "file": "light-flicker.wav",
+      "segment": 0,
+      "offset_ms": 200,
+      "volume": 0.18,
+      "max_duration_ms": 1500
+    },
+    {
+      "_comment": "Subtle electronic chirp behind the first HUD readout.",
+      "file": "hud-chirp.wav",
+      "segment": 3,
+      "offset_ms": 0,
+      "volume": 0.12,
+      "max_duration_ms": 800
+    },
+    {
+      "_comment": "Distant low rumble when Aurora first speaks.",
+      "file": "low-rumble.wav",
+      "segment": 12,
+      "offset_ms": 100,
+      "volume": 0.10,
+      "max_duration_ms": 3000
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audiobooker"
+version = "0.1.0"
+description = "Multi-voice audiobook generator: parse a chapter into segments, render with Kokoro and/or ElevenLabs, layer ambient SFX, output a single WAV."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "draca-glitch" }]
+keywords = ["tts", "audiobook", "kokoro", "elevenlabs", "narration"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "kokoro-onnx>=0.4.0",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+    "httpx>=0.27",
+    "pedalboard>=0.9",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.5"]
+
+[project.scripts]
+audiobooker = "audiobooker.gen:main"
+audiobooker-mix-sfx = "audiobooker.mix_sfx:main"
+audiobooker-tts = "audiobooker.tts_cli:main"
+audiobooker-sfx-gen = "audiobooker.sfx_gen:main"
+
+[project.urls]
+Homepage = "https://github.com/draca-glitch/audiobooker"
+Issues = "https://github.com/draca-glitch/audiobooker/issues"
+
+[tool.setuptools.packages.find]
+include = ["audiobooker*"]
+exclude = ["tests*", "examples*"]

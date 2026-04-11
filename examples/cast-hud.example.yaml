@@ -1,0 +1,98 @@
+# audiobooker — example cast with HUD/Entity features enabled.
+#
+# Pair this file with examples/chapter-hud.example.txt:
+#   audiobooker examples/chapter-hud.example.txt --cast examples/cast-hud.example.yaml
+#
+# This config demonstrates:
+#   - HUD bracket parsing ([Status: Online] → spoken by a robotic voice)
+#   - Entity italics (<!-- voice: Aurora --> *italic text*)
+#   - Per-character pedalboard effect chains
+#   - Pronunciation overrides
+
+engine_defaults:
+  output_dir: ./out
+  sample_rate: 24000
+  llm:
+    base_url: https://api.anthropic.com/v1
+    model: claude-opus-4-6
+    api_key_env: ANTHROPIC_API_KEY
+    compat: anthropic
+    max_tokens: 16384
+
+kokoro:
+  model: /opt/kokoro/kokoro-v1.0.onnx
+  voices: /opt/kokoro/voices-v1.0.bin
+  language: en-us
+
+elevenlabs:
+  api_url: https://api.elevenlabs.io/v1/text-to-speech
+  model: eleven_multilingual_v2
+  api_key_env: ELEVENLABS_API_KEY
+  output_format: pcm_24000
+
+features:
+  hud_brackets: true            # parse [bracketed] system messages
+  entity_italics: true          # parse <!-- voice: NAME --> *italics*
+
+cast:
+  narrator:
+    kokoro_voice: am_michael
+    speed: 1.0
+
+  Vance:
+    kokoro_voice: am_fenrir
+    speed: 0.95
+
+  Rell:
+    kokoro_voice: af_bella
+    speed: 0.95
+
+  Aurora:                        # the AI Entity
+    kokoro_voice: bf_emma
+    speed: 0.9
+    effect: entity
+
+  _hud:                          # special: spoken voice for [bracketed] HUD readouts
+    kokoro_voice: bm_lewis
+    speed: 1.1
+    effect: robot
+
+  _female_fallback:
+    kokoro_voice: af_jessica
+  _male_fallback:
+    kokoro_voice: am_liam
+
+# ----- Pronunciations ----------------------------------------------------
+# These ride alongside the built-in fixes (em-dash → comma, "..." for long
+# pauses, kg/cm/km/mm spelled out, thousands separators stripped).
+pronunciations:
+  Aeon: ay-on
+  Vance: vants
+  Rell: rell
+
+# ----- Effects -----------------------------------------------------------
+# Each effect is a list of single-key mappings: { plugin_name: { kwargs } }.
+# Plugins: pitch_shift, reverb, distortion, bitcrush, chorus, compressor,
+# delay, gain, highpass, lowpass.
+effects:
+  robot:
+    - bitcrush: { bit_depth: 8 }
+    - chorus: { rate_hz: 0.5, depth: 0.2 }
+
+  entity:
+    - bitcrush: { bit_depth: 8 }
+    - chorus: { rate_hz: 0.5, depth: 0.2 }
+    - pitch_shift: { semitones: -1 }
+    - reverb: { room_size: 0.3, wet_level: 0.15 }
+
+  dark:
+    - pitch_shift: { semitones: -2 }
+    - reverb: { room_size: 0.6, wet_level: 0.25 }
+
+  demon:
+    - pitch_shift: { semitones: -5 }
+    - distortion: { drive_db: 15 }
+    - reverb: { room_size: 0.6, wet_level: 0.3 }
+
+  whisper:
+    - reverb: { room_size: 0.3, wet_level: 0.6 }

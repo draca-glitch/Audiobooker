@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+.env
+
+# Audiobooker outputs
+out/
+*.wav
+*.mp3
+*.m4b
+*.flac
+*.ogg
+*.opus
+
+# Cache and segment intermediates
+*-segments/
+*-segments.json
+*.filelist.txt
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local secrets / private cast files
+*.local.yaml
+*.private.yaml
+.navajo-env
