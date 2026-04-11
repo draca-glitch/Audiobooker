@@ -541,6 +541,18 @@ audiobooker-sfx-gen "<prompt>" <output.wav>
 
 ---
 
+## Supporting audiobooker
+
+audiobooker is MIT-licensed and developed by one person on a home server, in spare time, mostly because I wanted my own books read aloud with a real cast and could not find a tool that did it the way I wanted. There is no company behind it, no venture-capital pressure, and no plans to add a paid tier. If audiobooker saves you time, helps your fiction sound the way it sounds in your head, or just makes you smile, you can chip in:
+
+- ⭐ **Star the repo**. Costs nothing, helps people find it.
+- ☕ **Buy me a coffee**: [buymeacoffee.com/dracaglitch](https://buymeacoffee.com/dracaglitch)
+- 💖 **GitHub Sponsors**: [github.com/sponsors/draca-glitch](https://github.com/sponsors/draca-glitch) *(page set up, pending GitHub approval)*
+- 🐛 **Open issues** for bugs, broken extractors, weird edge cases you hit on real chapters
+- 🛠️ **Send PRs**: extra cast.yaml examples, better pronunciations, integrations with other TTS engines, anything
+
+Sponsorship goes directly toward keeping the development server running and toward more time spent improving audiobooker instead of doing my day job. Nothing you sponsor unlocks paid features. audiobooker stays one piece of software, fully open source, with everything in the public repo.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
