@@ -97,15 +97,18 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 # 1. Render the bundled park bench example with the default Kokoro engine
 audiobooker examples/chapter.example.txt --cast examples/cast.example.yaml
 
-# Output → ./out/<hash>.wav
+# Output → ./out/<hash>.m4b (AAC 64k stereo, audiobook format with bookmark support)
 ```
 
 That's it. The first run will:
 1. Call your LLM to parse the chapter into segments (cached, won't re-call unless the chapter changes)
 2. Render each segment with Kokoro
 3. ffmpeg-concat the segments with context-aware silence gaps
+4. Re-encode to AAC in an M4B audiobook container (64k stereo, ~10-15x smaller than raw WAV)
 
-Subsequent runs of the same chapter file are cached and return instantly.
+Subsequent runs of the same chapter file are cached and return instantly. Pass `--format wav` if you want raw PCM instead of M4B.
+
+**Recommended approach: render one chapter at a time.** audiobooker is designed around per-chapter rendering. Each chapter gets its own M4B file, its own cached segment JSON, and its own per-segment WAVs. This means you can iterate on a single chapter (fix a pronunciation, swap a voice, re-parse after an edit) without touching the rest of the book. Once all chapters are rendered, assemble them into a single book-length M4B with chapter markers using `audiobooker-assemble` (see below).
 
 To use ElevenLabs for character dialogue and Kokoro for narration:
 
@@ -114,7 +117,28 @@ export ELEVENLABS_API_KEY="..."
 audiobooker examples/chapter.example.txt --cast examples/cast.example.yaml --engine hybrid
 ```
 
-To layer ambient SFX and one-shots after rendering:
+To assemble per-chapter M4B files into a single audiobook with chapter markers:
+
+```yaml
+# book.yaml
+title: "My Book Title"
+author: "Author Name"
+chapters:
+  - title: "Prologue"
+    file: out/abc123.m4b
+  - title: "Chapter 1"
+    file: out/def456.m4b
+  - title: "Chapter 2"
+    file: out/ghi789.m4b
+```
+
+```bash
+audiobooker-assemble book.yaml --output my-book.m4b
+```
+
+The assembler probes each chapter for duration, generates ffmpeg chapter metadata, and concatenates everything into one M4B with chapter markers that audiobook players (Apple Books, Prologue, Smart Audiobook Player, etc.) can navigate. No re-encoding: the chapters are already AAC, so this step just remuxes them into a single container. Fast even for long books.
+
+To layer ambient SFX and one-shots after rendering (before assembly):
 
 ```bash
 audiobooker-mix-sfx \
@@ -504,12 +528,23 @@ Each engine has its own cache suffix (`-el` for ElevenLabs, `-hy` for hybrid) so
 ```
 audiobooker <chapter_file> --cast <cast.yaml> [options]
 
-  --output PATH            Override output WAV path
+  --output PATH            Override output path
   --force                  Regenerate even if cached
   --segments-only          Only run the parser, skip TTS rendering
   --engine {kokoro,elevenlabs,hybrid}
                            TTS engine (default: kokoro)
+  --format {aac,wav}       Output format (default: aac, produces .m4b audiobook container)
 ```
+
+### `audiobooker-assemble`
+
+Assemble per-chapter M4B files into a single book-length M4B with chapter markers. No re-encoding; just remuxes the existing AAC streams into one container.
+
+```
+audiobooker-assemble <book.yaml> --output <book.m4b>
+```
+
+The manifest YAML lists chapters in order with titles and file paths. The assembler probes each file for duration and generates ffmpeg chapter metadata automatically.
 
 ### `audiobooker-mix-sfx`
 

@@ -85,6 +85,34 @@ def concatenate_wavs(wav_paths: list[str], output_path: str) -> bool:
     return True
 
 
+def reencode_to_aac(wav_path: str, output_path: str, bitrate: str = "64k") -> bool:
+    """Re-encode a WAV file to AAC in an M4B (audiobook) container via ffmpeg.
+
+    M4B is the standard audiobook format: same AAC codec and MP4 container as
+    M4A, but the .m4b extension tells media players to treat it as an audiobook
+    with bookmark support, position resume, and library categorization.
+
+    Produces a stereo AAC file at the specified bitrate. For speech/audiobook
+    content, 64k stereo is more than sufficient and produces files roughly
+    10-15x smaller than the source WAV.
+    """
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", wav_path,
+            "-c:a", "aac",
+            "-b:a", bitrate,
+            "-ac", "2",       # stereo
+            output_path,
+        ],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: AAC encode failed: {result.stderr}", file=sys.stderr)
+        return False
+    return True
+
+
 # --- Per-engine renderers -----------------------------------------------
 
 
@@ -245,8 +273,14 @@ def main():
     )
     parser.add_argument("chapter_file", help="Path to a chapter .txt file")
     parser.add_argument("--cast", required=True, help="Path to cast.yaml")
-    parser.add_argument("--output", help="Output WAV path (default: <output_dir>/<hash>.wav)")
+    parser.add_argument("--output", help="Output path (default: <output_dir>/<hash>.<format>)")
     parser.add_argument("--force", action="store_true", help="Regenerate even if cached")
+    parser.add_argument(
+        "--format",
+        choices=["wav", "aac"],
+        default="aac",
+        help="Output format: aac (default, 64k stereo M4B audiobook container, ~10-15x smaller) or wav (raw PCM)",
+    )
     parser.add_argument(
         "--segments-only",
         action="store_true",
@@ -274,9 +308,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     suffix = {"kokoro": "", "elevenlabs": "-el", "hybrid": "-hy"}[args.engine]
+    ext = "m4b" if args.format == "aac" else "wav"
     output_path = (
         Path(args.output) if args.output
-        else output_dir / f"{content_hash}{suffix}.wav"
+        else output_dir / f"{content_hash}{suffix}.{ext}"
     )
     segments_path = output_dir / f"{content_hash}-segments.json"
     el_segments_path = output_dir / f"{content_hash}-el-segments.json"
@@ -343,13 +378,26 @@ def main():
     print(f"Rendered {len(wav_paths)} WAVs in {time.time()-t0:.1f}s")
 
     # Step 3: concatenate
+    wav_output = output_dir / f"{content_hash}{suffix}.wav"
     print("Concatenating...")
-    if concatenate_wavs(wav_paths, str(output_path)):
-        size_mb = output_path.stat().st_size / (1024 * 1024)
-        print(f"Done: {output_path} ({size_mb:.1f} MB)")
-        print(output_path)
-    else:
+    if not concatenate_wavs(wav_paths, str(wav_output)):
         sys.exit(1)
+
+    # Step 4: re-encode if requested (default: AAC in M4B audiobook container)
+    if args.format == "aac":
+        print("Re-encoding to AAC M4B (64k stereo)...")
+        if not reencode_to_aac(str(wav_output), str(output_path)):
+            sys.exit(1)
+        # Remove the intermediate WAV to save disk
+        wav_output.unlink(missing_ok=True)
+    else:
+        # WAV output: the concat result is already the final file
+        if wav_output != output_path:
+            wav_output.rename(output_path)
+
+    size_mb = output_path.stat().st_size / (1024 * 1024)
+    print(f"Done: {output_path} ({size_mb:.1f} MB)")
+    print(output_path)
 
 
 if __name__ == "__main__":

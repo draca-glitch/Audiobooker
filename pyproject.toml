@@ -36,6 +36,7 @@ dev = ["pytest>=7", "ruff>=0.5"]
 
 [project.scripts]
 audiobooker = "audiobooker.gen:main"
+audiobooker-assemble = "audiobooker.assemble:main"
 audiobooker-mix-sfx = "audiobooker.mix_sfx:main"
 audiobooker-tts = "audiobooker.tts_cli:main"
 audiobooker-sfx-gen = "audiobooker.sfx_gen:main"
