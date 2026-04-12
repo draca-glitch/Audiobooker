@@ -21,3 +21,4 @@ A short scene with two operatives (Vance and Rell), a HUD system readout, and an
 
 - `corridor-kokoro-ch2.m4b` — Kokoro only
 - `corridor-hybrid-ch2.m4b` — Hybrid (Vance and Rell on ElevenLabs, HUD and Aurora on Kokoro with effects)
+- `corridor-hybrid-sfx-ch2.m4b` — Hybrid + SFX layer via `audiobooker-mix-sfx`. TNG ambient hum throughout, AI-generated HUD chirps before each system readout, Trek computer alarm with corridor reverb as Aurora's hailing announcement, and an AI-generated light flicker on the opening line. Demonstrates the full SFX mixing pipeline with the lookahead limiter that keeps voices at full volume while SFX stay prominent.
