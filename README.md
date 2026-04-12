@@ -28,8 +28,16 @@ chapter.txt + cast.yaml ─┐
                   └──────┬──────┘
                          │
                          ▼
-                   chapter.wav
-                   (+ optional SFX mix in a second pass)
+                  ┌─────────────┐
+                  │  AAC encode │   (64k stereo M4B audiobook
+                  │  (default)  │    container; --format wav to skip)
+                  └──────┬──────┘
+                         │
+                         ▼
+                   chapter.m4b
+                   (+ optional SFX mix before encode)
+                   (+ optional book assembly via audiobooker-assemble
+                      with chapter markers for the full book)
 ```
 
 ## Status
