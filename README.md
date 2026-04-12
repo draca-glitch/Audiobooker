@@ -157,7 +157,7 @@ audiobooker-mix-sfx \
     out/<hash>-segments.json \
     /path/to/sfx-wavs \
     out/chapter-mixed.wav \
-    --config examples/sfx-config.example.json
+    --config examples/chapter-hud-sfx-config.example.json
 ```
 
 ---
@@ -493,7 +493,7 @@ Two kinds of layers are supported:
 ]
 ```
 
-See `examples/sfx-config.example.json` for a full annotated example.
+See `examples/chapter-hud-sfx-config.example.json` for a full annotated example.
 
 ### Where to get the SFX files
 

@@ -172,13 +172,57 @@ def mix_chapter(seg_dir: Path, segments_json: Path, sfx_dir: Path, config: dict,
 
     mixed = dry + sfx_layer
 
-    # Normalize to prevent clipping
-    peak = np.max(np.abs(mixed))
-    if peak > 0.95:
-        mixed = mixed * (0.95 / peak)
-        print(f"  Normalized: peak {peak:.3f} → 0.95")
+    # Limiter: instead of scaling the entire file down (which makes voices
+    # quiet when SFX peaks are loud), we apply a lookahead limiter that
+    # only attenuates samples near loud peaks. Voices stay at full volume,
+    # SFX peaks get gently tamed.
+    mixed = _limit(mixed, sample_rate, ceiling=0.95, release_ms=50)
 
     return mixed
+
+
+def _limit(audio: np.ndarray, sample_rate: int, ceiling: float = 0.95,
+           release_ms: float = 50) -> np.ndarray:
+    """Simple lookahead peak limiter.
+
+    Instead of scaling the entire file by a single global factor (which
+    makes voices quiet when SFX peaks are loud), this applies per-sample
+    gain reduction only around loud peaks, with a smooth release so the
+    limiting doesn't click.
+
+    For audiobook SFX mixing this means: voices stay at full volume, SFX
+    peaks above the ceiling get gently pushed down, and the overall output
+    sounds as loud as the voice track rather than as quiet as the
+    normalization factor would make it.
+    """
+    abs_audio = np.abs(audio)
+    peak = np.max(abs_audio)
+
+    if peak <= ceiling:
+        return audio  # nothing to do
+
+    # Build a per-sample gain envelope
+    gain = np.ones_like(audio)
+    over = abs_audio > ceiling
+    gain[over] = ceiling / abs_audio[over]
+
+    # Smooth the gain envelope with a release filter so transitions
+    # don't click. Simple one-pole lowpass on the gain signal.
+    release_samples = int(sample_rate * release_ms / 1000)
+    if release_samples > 0:
+        coeff = np.exp(-1.0 / release_samples)
+        smoothed = np.copy(gain)
+        for i in range(1, len(smoothed)):
+            # Gain can drop instantly (attack=0) but recovers slowly (release)
+            if smoothed[i] > smoothed[i - 1]:
+                smoothed[i] = coeff * smoothed[i - 1] + (1 - coeff) * smoothed[i]
+        gain = smoothed
+
+    limited = audio * gain
+    reduction_db = 20 * np.log10(peak / ceiling)
+    print(f"  Limiter: peak {peak:.3f} → {ceiling} ({reduction_db:.1f} dB reduction on peaks only)")
+
+    return limited
 
 
 def main():

@@ -1,0 +1,54 @@
+{
+  "_comment": "SFX mix config for examples/chapter-hud.example.txt. SFX files generated via audiobooker-sfx-gen from text prompts.",
+  "ambients": [
+    {
+      "_comment": "Quiet corridor hum bed under most of the scene. Looped + faded.",
+      "file": "tng-hum.wav",
+      "start_seg": 0,
+      "end_seg": 30,
+      "volume": 5.0
+    }
+  ],
+  "oneshots": [
+    {
+      "_comment": "Light flicker click on the opening line.",
+      "file": "light-flicker.wav",
+      "segment": 0,
+      "offset_ms": 200,
+      "volume": 2.0,
+      "max_duration_ms": 1500
+    },
+    {
+      "_comment": "Electronic chirp plays during narrator 'visor display pulsed' and finishes just before HUD speaks.",
+      "file": "hud-chirp.wav",
+      "segment": 3,
+      "offset_ms": 5400,
+      "volume": 10.0,
+      "max_duration_ms": 800
+    },
+    {
+      "_comment": "Electronic chirp plays during narrator 'HUD refreshed' and finishes just before HUD speaks.",
+      "file": "hud-chirp.wav",
+      "segment": 10,
+      "offset_ms": 3500,
+      "volume": 10.0,
+      "max_duration_ms": 800
+    },
+    {
+      "_comment": "Hailing chime before Aurora speaks, like a ship intercom announcement.",
+      "file": "alarm03-reverb.wav",
+      "segment": 13,
+      "offset_ms": 10500,
+      "volume": 2.5,
+      "max_duration_ms": 800
+    },
+    {
+      "_comment": "Electronic chirp plays during narrator 'soft chime sounded' and finishes just before HUD speaks.",
+      "file": "hud-chirp.wav",
+      "segment": 22,
+      "offset_ms": 3600,
+      "volume": 10.0,
+      "max_duration_ms": 800
+    }
+  ]
+}
