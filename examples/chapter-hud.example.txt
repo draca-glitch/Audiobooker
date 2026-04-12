@@ -2,8 +2,7 @@ The corridor lights flickered once and then steadied into a soft amber. Vance st
 
 "Tell me you saw that," he said.
 
-[Local power fluctuation: 3 percent under nominal.]
-[Cause: unknown. Filtering subsystems holding.]
+His visor display pulsed once and projected a readout into the corner of his vision. [Local power fluctuation: 3 percent under nominal.] [Cause: unknown. Filtering subsystems holding.]
 
 Rell appeared from the side passage, tablet in hand, her face washed pale by its glow. "Saw it. Logged it. Whatever's down there isn't running on the same grid we are."
 
@@ -11,8 +10,7 @@ Rell appeared from the side passage, tablet in hand, her face washed pale by its
 
 "It wasn't meant to be."
 
-[Air composition: trace ozone, plus zero point four ppm.]
-[Recommendation: keep moving.]
+The HUD refreshed with a new line, unprompted. [Air composition: trace ozone, plus zero point four ppm.] [Recommendation: keep moving.]
 
 Vance let out a slow breath and checked the strap on his pack out of habit. He hadn't been this far into the lower decks in eleven months and he was very aware of it.
 
@@ -21,7 +19,7 @@ Vance let out a slow breath and checked the strap on his pack out of habit. He h
 
 The voice came from nowhere and everywhere at once, the way Aurora's voice always did. Rell glanced at him, eyebrow raised.
 
-"Did she just—"
+"Did she just--"
 
 "Yeah. She does that now." Vance started walking again. "She says it makes her feel less abstract."
 
@@ -29,8 +27,7 @@ The voice came from nowhere and everywhere at once, the way Aurora's voice alway
 
 "I couldn't stop her if I wanted to."
 
-[Forward sensor array: clear to next junction.]
-[Notice: ambient temperature dropping one point two degrees per minute.]
+A soft chime sounded and the visor updated again. [Forward sensor array: clear to next junction.] [Notice: ambient temperature dropping one point two degrees per minute.]
 
 Rell zipped her jacket up to her throat. "I really hope this is just a maintenance fault."
 

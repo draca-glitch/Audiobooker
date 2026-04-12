@@ -68,7 +68,9 @@ def concatenate_wavs(wav_paths: list[str], output_path: str) -> bool:
     list_path = output_path + ".filelist.txt"
     with open(list_path, "w") as f:
         for p in wav_paths:
-            f.write(f"file '{p}'\n")
+            # Use absolute paths because ffmpeg concat resolves relative paths
+            # relative to the file list location, not the working directory.
+            f.write(f"file '{os.path.abspath(p)}'\n")
 
     result = subprocess.run(
         [

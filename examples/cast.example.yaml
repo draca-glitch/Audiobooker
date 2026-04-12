@@ -43,18 +43,18 @@ features:
 cast:
   narrator:
     kokoro_voice: am_michael            # steady, authoritative
+    elevenlabs_voice: JBFqnCBsd6RMkjVDRZzb   # George — warm storyteller
     speed: 1.0
-    # elevenlabs_voice: JBFqnCBsd6RMkjVDRZzb   # George — warm storyteller (public preset)
 
   Anna:
     kokoro_voice: af_bella              # warm, friendly
+    elevenlabs_voice: cgSgspJ2msm6clMCkdW9   # Jessica — playful, higher energy
     speed: 0.95
-    # elevenlabs_voice: hpp4J3VqNfWAUOO0d1Us
 
   Marcus:
     kokoro_voice: bm_lewis              # calm, mid-range male
+    elevenlabs_voice: IKne3meq5aSn9XLyUdCD   # Charlie — deep, calm
     speed: 1.0
-    # elevenlabs_voice: onwK4e9ZLuTAKqWW03F9
 
   # Fallback voices for any unnamed character the parser tags by gender.
   _female_fallback:

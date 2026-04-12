@@ -37,23 +37,28 @@ features:
 cast:
   narrator:
     kokoro_voice: am_michael
+    elevenlabs_voice: JBFqnCBsd6RMkjVDRZzb   # George — warm storyteller
     speed: 1.0
 
   Vance:
     kokoro_voice: am_fenrir
+    elevenlabs_voice: cjVigY5qzO86Huf0OWal   # Eric — smooth, measured
     speed: 0.95
 
   Rell:
     kokoro_voice: af_bella
+    elevenlabs_voice: SAz9YHcvj6GT2YYXdXww   # River — relaxed, neutral
     speed: 0.95
 
   Aurora:                        # the AI Entity
     kokoro_voice: bf_emma
+    elevenlabs_voice: pFZP5JQG7iQjIQuC4Bku   # Lily — velvety British
     speed: 0.9
     effect: entity
 
   _hud:                          # special: spoken voice for [bracketed] HUD readouts
     kokoro_voice: bm_lewis
+    elevenlabs_voice: onwK4e9ZLuTAKqWW03F9   # Daniel — steady broadcaster
     speed: 1.1
     effect: robot
 
