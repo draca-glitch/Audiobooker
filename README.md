@@ -9,28 +9,31 @@ chapter.txt + cast.yaml ─┐
                          │
                          ▼
                   ┌─────────────┐
-                  │  LLM parser │   (split into segments per
-                  │  (Claude /  │    character, dialogue tags
-                  │   any LLM)  │    detected and attributed)
+                  │  LLM parser │   split into segments per character,
+                  │  (Claude /  │   dialogue tags detected and attributed
+                  │   any LLM)  │
                   └──────┬──────┘
                          │
                          ▼
                   ┌─────────────┐
-                  │     TTS     │   (Kokoro local / ElevenLabs cloud /
-                  │   render    │    hybrid; per-segment effects via
-                  │             │    pedalboard)
+                  │     TTS     │   each segment rendered to a small WAV
+                  │   render    │   (Kokoro local / ElevenLabs cloud /
+                  │             │   hybrid + per-segment pedalboard effects)
+                  └──────┬──────┘
+                         │
+                     many small
+                     WAV files
+                         │
+                         ▼
+                  ┌─────────────┐
+                  │   ffmpeg    │   concat all segment WAVs into one file
+                  │   concat    │   with context-aware silence gaps
                   └──────┬──────┘
                          │
                          ▼
                   ┌─────────────┐
-                  │   ffmpeg    │   (concat segments with
-                  │   concat    │    context-aware silence gaps)
-                  └──────┬──────┘
-                         │
-                         ▼
-                  ┌─────────────┐
-                  │  AAC encode │   (64k stereo M4B audiobook
-                  │  (default)  │    container; --format wav to skip)
+                  │  AAC encode │   re-encode to 64k stereo M4B audiobook
+                  │  (default)  │   container (--format wav to skip this)
                   └──────┬──────┘
                          │
                          ▼
