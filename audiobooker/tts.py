@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import io
 from typing import Any
 
 import httpx
 import numpy as np
+
+from audiobooker.retry import with_retry
 
 
 # --- Kokoro -------------------------------------------------------------
@@ -63,32 +64,35 @@ class ElevenLabsEngine:
         settings: dict[str, float],
     ) -> tuple[np.ndarray, int]:
         url = f"{self.api_url}/{voice_id}"
-        resp = httpx.post(
-            url,
-            params={"output_format": self.output_format},
-            headers={
-                "xi-api-key": self.api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "text": text,
-                "model_id": self.model,
-                "voice_settings": {
-                    "stability": settings.get("stability", 0.55),
-                    "similarity_boost": settings.get("similarity_boost", 0.75),
-                    "style": settings.get("style", 0.20),
-                    "use_speaker_boost": True,
-                },
-            },
-            timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0),
-        )
-        if resp.status_code == 401:
-            raise RuntimeError("ElevenLabs: invalid API key")
-        if resp.status_code == 429:
-            raise RuntimeError("ElevenLabs: rate limited or character quota exceeded")
-        resp.raise_for_status()
 
-        pcm_bytes = resp.content
+        def _call() -> bytes:
+            resp = httpx.post(
+                url,
+                params={"output_format": self.output_format},
+                headers={
+                    "xi-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "text": text,
+                    "model_id": self.model,
+                    "voice_settings": {
+                        "stability": settings.get("stability", 0.55),
+                        "similarity_boost": settings.get("similarity_boost", 0.75),
+                        "style": settings.get("style", 0.20),
+                        "use_speaker_boost": True,
+                    },
+                },
+                timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0),
+            )
+            if resp.status_code == 401:
+                raise RuntimeError("ElevenLabs: invalid API key")
+            if resp.status_code == 429:
+                raise RuntimeError("ElevenLabs: rate limited or character quota exceeded")
+            resp.raise_for_status()
+            return resp.content
+
+        pcm_bytes = with_retry(_call, what="elevenlabs tts")
         samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
         return samples, self.sample_rate
 

@@ -139,29 +139,62 @@ def _strip_fences(content: str) -> str:
 
 
 def _parse_json_with_recovery(content: str) -> list[dict[str, Any]]:
-    """Parse a JSON array, with recovery for truncated output."""
+    """Parse a JSON array, with recovery for preamble/suffix prose and truncation."""
     content = _strip_fences(content)
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        # Walk back through closing braces, trying to truncate to valid JSON
-        search_from = len(content)
-        for _ in range(50):
-            last_brace = content.rfind("}", 0, search_from)
-            if last_brace <= 0:
-                break
-            truncated = content[: last_brace + 1].rstrip().rstrip(",") + "\n]"
-            try:
-                segments = json.loads(truncated)
-                count = sum(1 for s in segments if isinstance(s, dict) and "type" in s)
-                print(
-                    f"  WARNING: parser JSON truncated, recovered {count} segments",
-                    file=sys.stderr,
-                )
-                return segments
-            except json.JSONDecodeError:
-                search_from = last_brace
-        raise
+
+    # Try each `[` position as the start of the array. This tolerates
+    # prose preamble, including prose that itself contains a stray `[`
+    # ("Here is the [first] JSON array: [...]"). Also try trimming to
+    # the last `]` in case there's trailing commentary.
+    candidates: list[str] = []
+    start = 0
+    while True:
+        pos = content.find("[", start)
+        if pos < 0:
+            break
+        chunk = content[pos:]
+        candidates.append(chunk)
+        rbracket = chunk.rfind("]")
+        if rbracket > 0:
+            candidates.append(chunk[: rbracket + 1])
+        start = pos + 1
+
+    # If there were no `[` at all, still try the raw content once so the
+    # original JSONDecodeError surfaces with its real context.
+    if not candidates:
+        candidates.append(content)
+
+    last_err: json.JSONDecodeError | None = None
+    for cand in candidates:
+        try:
+            parsed = json.loads(cand)
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError as e:
+            last_err = e
+
+    # Truncation recovery: walk back through `}` in the last viable candidate
+    # (the one starting at the first `[`), trying to close the array early.
+    tail = candidates[0]
+    search_from = len(tail)
+    for _ in range(50):
+        last_brace = tail.rfind("}", 0, search_from)
+        if last_brace <= 0:
+            break
+        truncated = tail[: last_brace + 1].rstrip().rstrip(",") + "\n]"
+        try:
+            segments = json.loads(truncated)
+            count = sum(1 for s in segments if isinstance(s, dict) and "type" in s)
+            print(
+                f"  WARNING: parser JSON truncated, recovered {count} segments",
+                file=sys.stderr,
+            )
+            return segments
+        except json.JSONDecodeError:
+            search_from = last_brace
+    if last_err is not None:
+        raise last_err
+    raise json.JSONDecodeError("no JSON array found in LLM output", content, 0)
 
 
 def _call_parser(
@@ -285,7 +318,7 @@ def parse_chapter(
     chapter_text = presplit_quotes(chapter_text)
     try:
         segments = _call_parser(client, chapter_text, features, engine)
-    except (json.JSONDecodeError, Exception) as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
         print(
             f"  Full-chapter parse failed ({e.__class__.__name__}), splitting in half...",
             file=sys.stderr,

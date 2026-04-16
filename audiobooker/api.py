@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import httpx
 
+from audiobooker.retry import with_retry
+
 
 class LLMClient:
     def __init__(
@@ -39,45 +41,53 @@ class LLMClient:
 
     def _chat_anthropic(self, system_prompt: str, user_prompt: str) -> str:
         url = f"{self.base_url}/messages"
-        resp = httpx.post(
-            url,
-            headers={
-                "x-api-key": self.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": self.model,
-                "max_tokens": self.max_tokens,
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": user_prompt}],
-            },
-            timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0),
-        )
-        resp.raise_for_status()
-        data = resp.json()
+
+        def _call():
+            resp = httpx.post(
+                url,
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": self.max_tokens,
+                    "system": system_prompt,
+                    "messages": [{"role": "user", "content": user_prompt}],
+                },
+                timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0),
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        data = with_retry(_call, what="anthropic parser")
         # Anthropic returns content as a list of blocks
         blocks = data.get("content", [])
         return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
 
     def _chat_openai(self, system_prompt: str, user_prompt: str) -> str:
         url = f"{self.base_url}/chat/completions"
-        resp = httpx.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.model,
-                "max_tokens": self.max_tokens,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            },
-            timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0),
-        )
-        resp.raise_for_status()
-        data = resp.json()
+
+        def _call():
+            resp = httpx.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": self.max_tokens,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                },
+                timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0),
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        data = with_retry(_call, what="openai parser")
         return data["choices"][0]["message"]["content"]

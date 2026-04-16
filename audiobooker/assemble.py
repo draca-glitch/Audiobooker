@@ -134,23 +134,28 @@ def assemble_book(manifest_path: str, output_path: str) -> None:
         metadata_path = f.name
         f.write(metadata_str)
 
-    # Assemble: concat + chapter markers, no re-encoding (copy codec)
+    # Assemble: concat + chapter markers, no re-encoding (copy codec).
+    # Wrap in try/finally so temp files are always cleaned up, even if
+    # ffmpeg itself crashes or the process is killed mid-run.
     print(f"Assembling {output_path}...")
-    result = subprocess.run(
-        [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0", "-i", concat_path,
-            "-i", metadata_path,
-            "-map_metadata", "1",
-            "-c:a", "copy",
-            output_path,
-        ],
-        capture_output=True, text=True,
-    )
-
-    # Cleanup temp files
-    os.unlink(concat_path)
-    os.unlink(metadata_path)
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0", "-i", concat_path,
+                "-i", metadata_path,
+                "-map_metadata", "1",
+                "-c:a", "copy",
+                output_path,
+            ],
+            capture_output=True, text=True,
+        )
+    finally:
+        for tmp in (concat_path, metadata_path):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
     if result.returncode != 0:
         print(f"ERROR: ffmpeg assemble failed: {result.stderr}", file=sys.stderr)

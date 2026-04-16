@@ -15,9 +15,27 @@ audiobooker <chapter_file> --cast <cast.yaml> [options]
   --engine {kokoro,elevenlabs,hybrid}
                            TTS engine (default: kokoro)
   --format {aac,wav}       Output format (default: aac, produces .m4b audiobook container)
+  --workers N              Parallel render workers. Defaults to 4 when
+                           ElevenLabs is in use (HTTP-bound, parallelizes well)
+                           and 1 for Kokoro-only.
+  --version                Print audiobooker version and exit.
 ```
 
 `--segments-only` is handy when iterating: parse the chapter once, inspect the segment JSON, fix any miss-attributed dialogue in the cast, then run the full render. The segment JSON is cached so the LLM only gets called once per chapter regardless.
+
+### Per-segment caching
+
+Each rendered segment is written to `<output_dir>/<hash>-segments/NNNN.wav` alongside an `NNNN.meta.json` sidecar holding a hash of its render inputs (engine, voice, speed, settings, effect chain, pronunciation rules, text). On rerun:
+
+- Segments whose inputs still match their meta are reused as-is.
+- Segments whose inputs changed (edited prose, swapped voice in `cast.yaml`, tweaked effect chain) re-render from scratch.
+- `--force` bypasses the cache entirely.
+
+This means you can iterate on one character's voice and only pay for that character's lines, and interrupted runs resume cheaply.
+
+### Retries
+
+All HTTP calls (Anthropic / OpenAI-compatible parser, ElevenLabs TTS, ElevenLabs Sound Generation) retry automatically on network errors, read timeouts and 5xx responses with exponential backoff. 4xx responses (bad key, invalid voice, quota exceeded) surface immediately — retrying them is pointless.
 
 ## `audiobooker-assemble`
 

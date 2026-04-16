@@ -19,6 +19,7 @@ from pathlib import Path
 import httpx
 
 from audiobooker.config import DEFAULT_ELEVENLABS, load_cast
+from audiobooker.retry import with_retry
 
 
 SOUND_GEN_URL = "https://api.elevenlabs.io/v1/sound-generation"
@@ -45,21 +46,25 @@ def generate_sfx(
     if duration_seconds is not None:
         body["duration_seconds"] = duration_seconds
 
-    resp = httpx.post(
-        SOUND_GEN_URL,
-        params={"output_format": output_format},
-        headers={
-            "xi-api-key": api_key,
-            "Content-Type": "application/json",
-        },
-        json=body,
-        timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0),
-    )
-    if resp.status_code == 401:
-        raise RuntimeError("ElevenLabs: invalid API key")
-    if resp.status_code == 429:
-        raise RuntimeError("ElevenLabs: rate limited or character quota exceeded")
-    resp.raise_for_status()
+    def _call() -> bytes:
+        resp = httpx.post(
+            SOUND_GEN_URL,
+            params={"output_format": output_format},
+            headers={
+                "xi-api-key": api_key,
+                "Content-Type": "application/json",
+            },
+            json=body,
+            timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0),
+        )
+        if resp.status_code == 401:
+            raise RuntimeError("ElevenLabs: invalid API key")
+        if resp.status_code == 429:
+            raise RuntimeError("ElevenLabs: rate limited or character quota exceeded")
+        resp.raise_for_status()
+        return resp.content
+
+    content = with_retry(_call, what="elevenlabs sfx-gen")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -69,11 +74,11 @@ def generate_sfx(
         import soundfile as sf
 
         sample_rate = int(output_format.split("_")[-1])
-        samples = np.frombuffer(resp.content, dtype=np.int16).astype(np.float32) / 32768.0
+        samples = np.frombuffer(content, dtype=np.int16).astype(np.float32) / 32768.0
         sf.write(str(output_path), samples, sample_rate)
     else:
         # mp3, etc. — write the bytes verbatim.
-        output_path.write_bytes(resp.content)
+        output_path.write_bytes(content)
 
 
 def main():

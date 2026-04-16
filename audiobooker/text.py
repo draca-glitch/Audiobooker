@@ -6,6 +6,40 @@ import re
 from typing import Any
 
 
+# Common English title / Latin abbreviations we must not expand into "Mr... Smith".
+# The backward walk in _expand_period_keeping_abbrev includes embedded periods,
+# so "i.e" and "e.g" are matched as 3-char tokens ending at the trailing period.
+_ABBREV = frozenset([
+    "Mr", "Mrs", "Ms", "Dr", "St", "Jr", "Sr", "Rev", "Hon", "Prof",
+    "Fr", "Sgt", "Lt", "Gen", "Col", "Cpl", "Pvt", "vs", "etc",
+    "i.e", "e.g", "U.S", "U.K",
+])
+
+
+def _expand_period_keeping_abbrev(text: str) -> str:
+    """Replace ". " with "... " except after common abbreviations."""
+    result = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] == "." and i + 1 < n and text[i + 1] == " ":
+            # Walk back to find the preceding word token.
+            j = i
+            while j > 0 and (text[j - 1].isalpha() or text[j - 1] == "."):
+                j -= 1
+            preceding = text[j:i]
+            if preceding in _ABBREV:
+                result.append(". ")
+                i += 2
+                continue
+            result.append("... ")
+            i += 2
+        else:
+            result.append(text[i])
+            i += 1
+    return "".join(result)
+
+
 def fix_pronunciation(text: str, pronunciations: dict[str, str]) -> str:
     """Apply pronunciation overrides + general TTS-friendly punctuation fixes.
 
@@ -17,8 +51,9 @@ def fix_pronunciation(text: str, pronunciations: dict[str, str]) -> str:
     """
     # Em-dash and en-dash → comma pause
     text = text.replace("—", ", ").replace("–", ", ")
-    # Lengthen periods slightly for clearer phrasing
-    text = re.sub(r"\. ", "... ", text)
+    # Lengthen periods slightly for clearer phrasing. Skip common title
+    # abbreviations (Mr./Dr./etc.) so we don't produce "Mr... Smith".
+    text = _expand_period_keeping_abbrev(text)
     # Symbols
     text = text.replace("~", "approximately ")
     # Common metric units (case-sensitive word boundary)
@@ -28,9 +63,11 @@ def fix_pronunciation(text: str, pronunciations: dict[str, str]) -> str:
     text = re.sub(r"\bkg\b", "kilograms", text)
     # Strip thousands separators inside numbers (1,400 → 1400)
     text = re.sub(r"(\d),(\d)", r"\1\2", text)
-    # Apply user pronunciation map last (case-insensitive)
+    # Apply user pronunciation map last (case-insensitive, whole-word only
+    # so a rule like "Ra" → "Rah" doesn't mangle "parapet" into "paRahpet").
     for word, phonetic in pronunciations.items():
-        text = re.sub(re.escape(word), phonetic, text, flags=re.IGNORECASE)
+        pattern = rf"\b{re.escape(word)}\b"
+        text = re.sub(pattern, phonetic, text, flags=re.IGNORECASE)
     return text
 
 
