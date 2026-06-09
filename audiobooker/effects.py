@@ -97,3 +97,23 @@ class EffectRegistry:
             return samples
         # pedalboard wants (channels, samples) float32
         return board(samples.reshape(1, -1), sample_rate).flatten()
+
+
+def resample(samples: np.ndarray, src_sr: int, dst_sr: int) -> np.ndarray:
+    """Resample audio to dst_sr using pedalboard's windowed-sinc StreamResampler.
+
+    A proper low-pass-filtered resampler, not linear interpolation, so it is
+    safe for audible-quality material (linear interpolation aliases audibly
+    on music and ambience). Shared by the segment renderer and the SFX mixer.
+    """
+    if src_sr == dst_sr:
+        return samples
+    from pedalboard.io import StreamResampler
+
+    buf = samples.astype(np.float32, copy=False).reshape(1, -1)
+    resampler = StreamResampler(float(src_sr), float(dst_sr), num_channels=1)
+    out = resampler.process(buf)
+    tail = resampler.process()  # flush
+    if tail.size:
+        out = np.concatenate([out, tail], axis=1)
+    return out.flatten()

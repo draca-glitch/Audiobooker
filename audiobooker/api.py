@@ -16,6 +16,18 @@ import httpx
 from audiobooker.retry import with_retry
 
 
+class TruncatedOutputError(RuntimeError):
+    """The model hit its output token budget mid-response.
+
+    Raised instead of returning a silently incomplete answer. The chapter
+    parser catches this (like any parse failure) and falls back to
+    splitting the chapter in half, which is the designed remedy for
+    output-budget overflow. Without this signal, JSON recovery would
+    salvage the truncated array and the tail of the chapter would vanish
+    from the audiobook without an error.
+    """
+
+
 class LLMClient:
     def __init__(
         self,
@@ -62,6 +74,10 @@ class LLMClient:
             return resp.json()
 
         data = with_retry(_call, what="anthropic parser")
+        if data.get("stop_reason") == "max_tokens":
+            raise TruncatedOutputError(
+                f"anthropic response truncated at max_tokens={self.max_tokens}"
+            )
         # Anthropic returns content as a list of blocks
         blocks = data.get("content", [])
         return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
@@ -90,4 +106,9 @@ class LLMClient:
             return resp.json()
 
         data = with_retry(_call, what="openai parser")
-        return data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            raise TruncatedOutputError(
+                f"openai-compat response truncated at max_tokens={self.max_tokens}"
+            )
+        return choice["message"]["content"] or ""

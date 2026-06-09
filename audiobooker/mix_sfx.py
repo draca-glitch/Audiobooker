@@ -22,15 +22,13 @@ DEFAULT_SAMPLE_RATE = 24000
 
 def load_wav_mono(path: str, sample_rate: int) -> np.ndarray:
     """Load a WAV file as mono float32 at the target sample rate."""
+    from audiobooker.effects import resample
+
     data, sr = sf.read(path, dtype="float32")
     if data.ndim > 1:
         data = data.mean(axis=1)
     if sr != sample_rate:
-        ratio = sample_rate / sr
-        new_len = int(len(data) * ratio)
-        x_old = np.linspace(0, 1, len(data))
-        x_new = np.linspace(0, 1, new_len)
-        data = np.interp(x_new, x_old, data)
+        data = resample(data, sr, sample_rate)
     return data
 
 

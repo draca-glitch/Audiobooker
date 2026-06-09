@@ -218,7 +218,44 @@ def _call_parser(
         f"{extra_reminder}\n\n{text}"
     )
     raw = client.chat(system_prompt, user_prompt)
-    return _parse_json_with_recovery(raw)
+    parsed = _parse_json_with_recovery(raw)
+    _check_coverage(text, parsed)
+    return parsed
+
+
+def _alnum_len(s: str) -> int:
+    return len(re.sub(r"[^0-9A-Za-z]", "", s))
+
+
+# Parsed segments legitimately lose some characters (stripped quotation
+# marks, HUD bracket rewrites, entity voice comments), so coverage below
+# 1.0 is normal. Falling under this ratio means actual sentences vanished,
+# which the prompt forbids and no recovery should paper over.
+_COVERAGE_THRESHOLD = 0.75
+_COVERAGE_MIN_CHARS = 500
+
+
+def _check_coverage(source_text: str, segments: list[dict[str, Any]]) -> None:
+    """Raise when the parsed segments cover too little of the source text.
+
+    Catches every silent-loss mode at once: truncated JSON that recovery
+    closed early, an LLM that summarized instead of splitting, or a model
+    that skipped a span. Raising sends parse_chapter to its half-and-half
+    fallback instead of letting an incomplete audiobook render.
+    """
+    in_len = _alnum_len(source_text)
+    if in_len < _COVERAGE_MIN_CHARS:
+        return
+    out_len = sum(
+        _alnum_len(str(s.get("text", "")))
+        for s in segments
+        if isinstance(s, dict)
+    )
+    if out_len < in_len * _COVERAGE_THRESHOLD:
+        raise ValueError(
+            f"parser output covers only {out_len}/{in_len} alphanumeric chars "
+            f"({out_len / in_len:.0%}) of the chapter; content was dropped"
+        )
 
 
 # --- Post-processing ----------------------------------------------------

@@ -1,6 +1,6 @@
 """audiobooker — multi-voice audiobook generator driven by a cast.yaml file."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from audiobooker.config import CastConfig, load_cast
 

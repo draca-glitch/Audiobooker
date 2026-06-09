@@ -28,7 +28,7 @@ import soundfile as sf
 from audiobooker import __version__
 from audiobooker.api import LLMClient
 from audiobooker.config import CastConfig, load_cast
-from audiobooker.effects import EffectRegistry
+from audiobooker.effects import EffectRegistry, resample
 from audiobooker.parser import parse_chapter
 from audiobooker.text import fix_pronunciation, pick_gap
 from audiobooker.tts import (
@@ -163,43 +163,25 @@ def _segment_cache_key(
     plan: dict[str, Any],
     effect_spec: Any,
     pronunciations: dict[str, str],
+    gap: float = 0.0,
 ) -> str:
     """Stable hash of everything that goes into one segment's audio output.
 
-    Changing any of: text, engine, voice, speed, settings, effect chain, or
-    pronunciation rules → new key → segment re-renders.
+    Changing any of: text, engine, voice, speed, settings, effect chain,
+    pronunciation rules, or trailing gap → new key → segment re-renders.
+    The gap matters because it is baked into the segment WAV and depends on
+    the NEIGHBORING segments; without it in the key, editing a neighbor
+    reuses this segment's cached audio with a now-wrong pause.
     """
     payload = {
         "text": seg["text"],
         "plan": plan,
         "effect_spec": effect_spec,
         "pron": pronunciations,
+        "gap": round(float(gap), 4),
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()
     return hashlib.md5(blob).hexdigest()[:16]
-
-
-def _resample(samples: np.ndarray, src_sr: int, dst_sr: int) -> np.ndarray:
-    """Resample audio to dst_sr using pedalboard's WindowedSinc resampler.
-
-    pedalboard is already a hard dep. Its StreamResampler is a proper
-    low-pass-filtered resampler, not linear interpolation, so it's safe
-    for audible-quality audiobook material.
-    """
-    if src_sr == dst_sr:
-        return samples
-    from pedalboard.io import StreamResampler
-
-    src_sr_f = float(src_sr)
-    dst_sr_f = float(dst_sr)
-    # Streamer expects shape (channels, samples) float32.
-    buf = samples.astype(np.float32, copy=False).reshape(1, -1)
-    resampler = StreamResampler(src_sr_f, dst_sr_f, num_channels=1)
-    out = resampler.process(buf)
-    tail = resampler.process()  # flush
-    if tail.size:
-        out = np.concatenate([out, tail], axis=1)
-    return out.flatten()
 
 
 def _render_one(
@@ -233,7 +215,7 @@ def _render_one(
         assert el_engine is not None
         samples, sr = el_engine.synth(tts_text, plan["voice_id"], plan["settings"])
     samples = effects.apply(plan["effect"], samples, sr)
-    samples = _resample(samples, sr, target_sr)
+    samples = resample(samples, sr, target_sr)
     return samples, target_sr
 
 
@@ -276,8 +258,13 @@ def render_segments(
             continue
         plan = _plan_segment(seg, cfg, engine)
 
+        prev_seg = segments[i - 1] if i > 0 else None
+        next_seg = segments[i + 1] if i < n - 1 else None
+        gap_duration = pick_gap(seg, next_seg, prev_seg, cfg.gaps)
+
         effect_spec = cfg.effects.get(plan["effect"]) if plan["effect"] else None
-        key = _segment_cache_key(seg, plan, effect_spec, cfg.pronunciations)
+        key = _segment_cache_key(seg, plan, effect_spec, cfg.pronunciations,
+                                 gap=gap_duration)
         seg_path = seg_dir / f"{i:04d}.wav"
         meta_path = seg_dir / f"{i:04d}.meta.json"
 
@@ -292,7 +279,7 @@ def render_segments(
                     continue
             except (json.JSONDecodeError, OSError):
                 pass
-        to_render.append((i, seg, plan, key))
+        to_render.append((i, seg, plan, key, gap_duration))
 
     if cached_count:
         print(f"  Cached: {cached_count}/{n} segments reused")
@@ -303,12 +290,9 @@ def render_segments(
     stats = {"kokoro_chars": 0, "elevenlabs_chars": 0}
     stats_lock = threading.Lock()
 
-    def _task(i: int, seg: dict[str, Any], plan: dict[str, Any], key: str) -> tuple[int, str]:
-        prev_seg = segments[i - 1] if i > 0 else None
-        next_seg = segments[i + 1] if i < n - 1 else None
-        gap_duration = pick_gap(seg, next_seg, prev_seg, cfg.gaps)
-
-        char = f" — {seg.get('character')}" if seg.get("character") else ""
+    def _task(i: int, seg: dict[str, Any], plan: dict[str, Any], key: str,
+              gap_duration: float) -> tuple[int, str]:
+        char = f" - {seg.get('character')}" if seg.get("character") else ""
         if plan["engine"] == "kokoro":
             label = f"KO:{plan['voice']} @{plan['speed']}x"
         else:
@@ -340,11 +324,12 @@ def render_segments(
             stats[f"{plan['engine']}_chars"] += len(seg["text"])
         return i, str(seg_path)
 
+    failed: list[int] = []
     if workers > 1 and to_render:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = {
-                pool.submit(_task, i, seg, plan, key): i
-                for (i, seg, plan, key) in to_render
+                pool.submit(_task, i, seg, plan, key, gap): i
+                for (i, seg, plan, key, gap) in to_render
             }
             for fut in as_completed(futures):
                 idx = futures[fut]
@@ -352,17 +337,30 @@ def render_segments(
                     i, path = fut.result()
                     paths[i] = path
                 except Exception as e:  # noqa: BLE001
+                    failed.append(idx)
                     print(
-                        f"  WARNING: segment {idx} failed: {e}",
+                        f"  ERROR: segment {idx} failed: {e}",
                         file=sys.stderr,
                     )
     else:
-        for (i, seg, plan, key) in to_render:
+        for (i, seg, plan, key, gap) in to_render:
             try:
-                _, path = _task(i, seg, plan, key)
+                _, path = _task(i, seg, plan, key, gap)
                 paths[i] = path
             except Exception as e:  # noqa: BLE001
-                print(f"  WARNING: segment {i} failed: {e}", file=sys.stderr)
+                failed.append(i)
+                print(f"  ERROR: segment {i} failed: {e}", file=sys.stderr)
+
+    if failed:
+        # A missing segment is a missing sentence in the finished audiobook.
+        # Concatenating around it would produce a structurally valid file
+        # with content silently absent, so the run must fail instead.
+        # Successfully rendered segments stay cached; a rerun resumes there.
+        raise RuntimeError(
+            f"{len(failed)} segment(s) failed to render: "
+            f"{sorted(failed)[:20]}{'...' if len(failed) > 20 else ''}. "
+            f"Rerun to retry (cached segments are reused)."
+        )
 
     if engine == "hybrid":
         print(
@@ -516,17 +514,21 @@ def main():
         )
 
     t0 = time.time()
-    wav_paths = render_segments(
-        segments,
-        seg_dir,
-        cfg,
-        args.engine,
-        kokoro,
-        el_engine,
-        effects,
-        force=args.force,
-        workers=workers,
-    )
+    try:
+        wav_paths = render_segments(
+            segments,
+            seg_dir,
+            cfg,
+            args.engine,
+            kokoro,
+            el_engine,
+            effects,
+            force=args.force,
+            workers=workers,
+        )
+    except RuntimeError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
     print(f"Rendered {len(wav_paths)} WAVs in {time.time()-t0:.1f}s")
 
     # Step 3: concatenate

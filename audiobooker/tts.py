@@ -87,8 +87,10 @@ class ElevenLabsEngine:
             )
             if resp.status_code == 401:
                 raise RuntimeError("ElevenLabs: invalid API key")
-            if resp.status_code == 429:
-                raise RuntimeError("ElevenLabs: rate limited or character quota exceeded")
+            # 429 deliberately NOT special-cased: raise_for_status turns it
+            # into HTTPStatusError, which with_retry backs off and retries.
+            # Converting it to RuntimeError here used to bypass retry
+            # entirely, so one rate-limit blip permanently failed a segment.
             resp.raise_for_status()
             return resp.content
 

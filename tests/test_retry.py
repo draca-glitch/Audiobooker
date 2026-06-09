@@ -72,3 +72,45 @@ def test_exhausted_retries_reraises():
 
     with pytest.raises(httpx.ConnectError):
         with_retry(fn, tries=2, base_delay=0)
+
+
+def _status_error(code: int, headers: dict | None = None):
+    resp = httpx.Response(code, headers=headers or {}, request=httpx.Request("POST", "http://x"))
+    return httpx.HTTPStatusError("err", request=resp.request, response=resp)
+
+
+def test_429_is_retried():
+    calls = {"n": 0}
+
+    def fn():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise _status_error(429)
+        return "ok"
+
+    assert with_retry(fn, tries=3, base_delay=0) == "ok"
+    assert calls["n"] == 3
+
+
+def test_429_honors_retry_after(monkeypatch):
+    import audiobooker.retry as retry_mod
+    sleeps = []
+    monkeypatch.setattr(retry_mod.time, "sleep", sleeps.append)
+    calls = {"n": 0}
+
+    def fn():
+        calls["n"] += 1
+        if calls["n"] < 2:
+            raise _status_error(429, {"Retry-After": "7"})
+        return "ok"
+
+    assert with_retry(fn, tries=3, base_delay=0.1) == "ok"
+    assert sleeps == [7.0]
+
+
+def test_other_4xx_not_retried():
+    def fn():
+        raise _status_error(403)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        with_retry(fn, tries=3, base_delay=0)

@@ -6,8 +6,9 @@ from the upstream. Without retries, one blip during a 500-segment render
 loses the entire run.
 
 This module provides a narrow retry wrapper: retry on network errors,
-read/connect timeouts, and 5xx responses; do NOT retry on 4xx (bad key,
-invalid voice, quota exceeded) because those will never succeed.
+read/connect timeouts, 5xx responses, and 429 rate limits (honoring
+Retry-After); do NOT retry on other 4xx (bad key, invalid voice) because
+those will never succeed.
 """
 
 from __future__ import annotations
@@ -36,8 +37,9 @@ def with_retry(
 ) -> T:
     """Call fn() with exponential backoff on transient errors.
 
-    Retries on network exceptions and HTTP 5xx. 4xx responses (including 401
-    auth and 429 quota) are raised immediately — no point retrying those.
+    Retries on network exceptions, HTTP 5xx, and HTTP 429 (rate limit,
+    honoring Retry-After). Other 4xx responses are raised immediately, no
+    point retrying those.
     """
     for attempt in range(tries):
         try:
@@ -53,12 +55,21 @@ def with_retry(
             )
             time.sleep(delay)
         except httpx.HTTPStatusError as e:
-            # Only 5xx is worth retrying. 4xx means the request itself is
-            # wrong (auth, bad voice id, malformed body, quota).
-            if 500 <= e.response.status_code < 600 and attempt < tries - 1:
+            # 5xx is transient upstream trouble. 429 is the one 4xx whose
+            # entire meaning is "retry later"; treating it as fatal turns a
+            # momentary rate limit into a permanently failed segment. Other
+            # 4xx (auth, bad voice id, malformed body) will never succeed.
+            code = e.response.status_code
+            if (code == 429 or 500 <= code < 600) and attempt < tries - 1:
                 delay = base_delay * (2**attempt)
+                retry_after = e.response.headers.get("Retry-After")
+                if retry_after:
+                    try:
+                        delay = max(delay, float(retry_after))
+                    except ValueError:
+                        pass
                 print(
-                    f"  {what}: HTTP {e.response.status_code} "
+                    f"  {what}: HTTP {code} "
                     f"(attempt {attempt + 1}/{tries}), retrying in {delay:.1f}s",
                     file=sys.stderr,
                 )

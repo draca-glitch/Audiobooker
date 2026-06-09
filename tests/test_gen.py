@@ -205,3 +205,50 @@ def test_parallel_elevenlabs(tmp_path, cast_cfg):
     # Order preserved: file 0000 corresponds to segment 0, etc.
     for i, p in enumerate(paths):
         assert Path(p).name == f"{i:04d}.wav"
+
+
+class FailingEngine:
+    """Engine stand-in that always raises (rate limit, network death, etc.)."""
+
+    def synth(self, *a, **kw):
+        raise RuntimeError("boom")
+
+
+def test_failed_segment_fails_the_run(cast_cfg, tmp_path):
+    segs = _segments()
+    with pytest.raises(RuntimeError, match="failed to render"):
+        render_segments(
+            segs, tmp_path / "segs", cast_cfg, "kokoro",
+            FailingEngine(), None, EffectRegistry({}), workers=1,
+        )
+
+
+def test_failed_segment_keeps_successes_cached(cast_cfg, tmp_path):
+    class FlakyEngine:
+        def __init__(self):
+            self.calls = 0
+
+        def synth(self, text, voice, speed=1.0):
+            self.calls += 1
+            if "Hello" in text:
+                raise RuntimeError("boom")
+            return np.zeros(2400, dtype=np.float32), 24000
+
+    seg_dir = tmp_path / "segs"
+    with pytest.raises(RuntimeError):
+        render_segments(
+            _segments(), seg_dir, cast_cfg, "kokoro",
+            FlakyEngine(), None, EffectRegistry({}), workers=1,
+        )
+    # the two narration segments rendered and are cached for the rerun
+    assert (seg_dir / "0000.wav").exists()
+    assert (seg_dir / "0002.wav").exists()
+    assert not (seg_dir / "0001.wav").exists()
+
+
+def test_gap_change_invalidates_cache_key(cast_cfg):
+    seg = {"type": "dialogue", "character": "Alice", "text": "Hi."}
+    plan = _plan_segment(seg, cast_cfg, "kokoro")
+    k1 = _segment_cache_key(seg, plan, None, {}, gap=0.35)
+    k2 = _segment_cache_key(seg, plan, None, {}, gap=0.75)
+    assert k1 != k2  # neighbor edits change the gap; cached WAV must re-render

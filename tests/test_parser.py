@@ -1,5 +1,7 @@
 """Parser JSON recovery + postprocessing regressions."""
 
+import pytest
+
 from audiobooker.parser import (
     _parse_json_with_recovery,
     postprocess_segments,
@@ -77,3 +79,47 @@ def test_presplit_quotes():
     out = presplit_quotes(line)
     lines = [ln for ln in out.split("\n") if ln.strip()]
     assert len(lines) >= 3
+
+
+class _StubClient:
+    """LLM stub: returns queued responses per call."""
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = 0
+
+    def chat(self, system_prompt, user_prompt):
+        self.calls += 1
+        return self.responses.pop(0)
+
+
+def _seg_json(texts):
+    import json as _json
+    return _json.dumps([{"type": "narration", "text": t} for t in texts])
+
+
+def test_coverage_check_catches_dropped_content():
+    from audiobooker.parser import _call_parser
+    text = "alpha " * 200  # 1000 alnum chars
+    client = _StubClient([_seg_json(["alpha " * 40])])  # only 20% covered
+    with pytest.raises(ValueError, match="content was dropped"):
+        _call_parser(client, text, {}, "kokoro")
+
+
+def test_parse_chapter_falls_back_to_halves_on_coverage_failure():
+    from audiobooker.parser import parse_chapter
+    text = ("alpha bravo charlie delta echo " * 40 + "\n\n"
+            + "foxtrot golf hotel india juliet " * 40)
+    half_a = _seg_json(["alpha bravo charlie delta echo " * 40])
+    half_b = _seg_json(["foxtrot golf hotel india juliet " * 40])
+    truncated = _seg_json(["alpha bravo charlie delta echo " * 4])  # ~10%
+    client = _StubClient([truncated, half_a, half_b])
+    segments = parse_chapter(text, client, {}, engine="kokoro")
+    assert client.calls == 3  # full attempt + two halves
+    joined = " ".join(s["text"] for s in segments)
+    assert "foxtrot" in joined and "alpha" in joined
+
+
+def test_truncated_output_error_exists():
+    from audiobooker.api import TruncatedOutputError
+    assert issubclass(TruncatedOutputError, RuntimeError)
