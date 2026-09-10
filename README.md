@@ -1,5 +1,7 @@
 # audiobooker
 
+**Author:** [Mikael Wedlund](https://eastblue.se/mikael-wedlund) (`draca-glitch`)
+
 **Multi-voice audiobook generator.** Take a chapter of prose, get back a single M4B file with a different voice for the narrator and each character, optional sound effects per character, and optional ambient SFX layered underneath.
 
 The whole project is driven by **one configuration file**: `cast.yaml`. You define which voices speak which characters, what pronunciation to override, and what audio effects to apply. Everything else is mechanical.
